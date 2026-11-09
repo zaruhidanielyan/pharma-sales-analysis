@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="hy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zaruhi Danielyan — SQL case study</title>
+<meta name="description" content="Sales and returns analysis for a pharmaceutical distributor — Oracle SQL case study by Zaruhi Danielyan.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Armenian:wght@400;500;600;700&amp;family=Noto+Serif+Armenian:wght@600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#F6F7F4}
+a{color:#0F6E5C}a:hover{color:#0A4E41}
+[hidden]{display:none!important}
+@keyframes growx{from{transform:scaleX(0)}}
+.grow-r{transform-origin:right;animation:growx .9s cubic-bezier(.2,.7,.2,1) .2s both}
+.grow-l{transform-origin:left;animation:growx 1.1s cubic-bezier(.2,.7,.2,1) .3s both}
+@keyframes growy{from{transform:scaleY(0)}}
+.grow-y{transform-origin:bottom;animation:growy 1s cubic-bezier(.2,.7,.2,1) .2s both}
+@media (prefers-reduced-motion: reduce){.grow-r,.grow-l,.grow-y{animation:none}}
+.lang-btn{background:#FFFFFF;color:#15201C}
+.lang-btn[aria-pressed="true"]{background:#15201C;color:#FFFFFF}
+:focus-visible{outline:3px solid #0F6E5C;outline-offset:2px}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div style="background: #F6F7F4; color: #15201C; font-family: 'Noto Sans Armenian', system-ui, sans-serif; font-size: 17px; line-height: 1.65">
+<header style="border-bottom: 1px solid #DCE2DD; background: #F6F7F4">
+<div style="max-width: 1120px; margin: 0 auto; padding: 16px 24px; display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center">
+<div data-lang="hy" style="font-weight: 600; font-size: 16px">Զարուհի Դանիելյան · Տվյալների վերլուծաբան</div>
+<div data-lang="en" lang="en" hidden style="font-weight: 600; font-size: 16px">Zaruhi Danielyan · Data Analyst</div>
+<div role="group" aria-label="Լեզու / Language" style="display: flex; border: 1px solid #15201C; border-radius: 8px; overflow: hidden">
+<button type="button" class="lang-btn" data-set="hy" lang="hy" aria-pressed="true" style="min-height: 44px; min-width: 56px; padding: 0 16px; border: 0; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer">Հայ</button>
+<button type="button" class="lang-btn" data-set="en" lang="en" aria-pressed="false" style="min-height: 44px; min-width: 56px; padding: 0 16px; border: 0; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer">EN</button>
+</div>
+</div>
+</header>
+<div lang="hy" data-lang="hy">
+<section style="max-width: 1120px; margin: 0 auto; padding: 80px 24px 64px; display: flex; flex-direction: column; gap: 24px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">ORACLE SQL · APEX · ԲԻԶՆԵՍ ՎԵՐԼՈՒԾՈՒԹՅՈՒՆ</div>
+<h1 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-weight: 700; font-size: clamp(36px, 5vw, 60px); line-height: 1.15; max-width: 920px">Վաճառքի և վերադարձների վերլուծություն. դեղերի դիստրիբյուտոր</h1>
+<p style="margin: 0; font-size: 20px; color: #3D4A45; max-width: 760px">Հինգ կապված աղյուսակից կազմված վաճառքի բազայի վրա 12 բիզնես հարցի պատասխան՝ պահեստների արդյունավետությունից մինչև զեղչերի ազդեցություն։ Գլխավոր արդյունքը. վերադարձները խլել են շահույթի 13.75%-ը, և այդ կորստի մեծ մասը կանխելի էր։</p>
+<div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px">
+<a href="#sql-hy" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 24px; background: #15201C; color: #FFFFFF; text-decoration: none; border-radius: 8px; font-weight: 600">Դիտել SQL կոդը</a>
+<a href="https://www.linkedin.com/in/zaruhi-danielyan" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 24px; border: 1px solid #15201C; color: #15201C; text-decoration: none; border-radius: 8px; font-weight: 600">LinkedIn</a>
+</div>
+</section>
+
+<section style="max-width: 1120px; margin: 0 auto; padding: 0 24px 80px">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 20px"><div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+<h3 style="margin: 0; font-size: 22px">Վերադարձների ազդեցությունը</h3>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap">
+<span style="font-weight: 600">Եկամուտ</span>
+<span><b style="font-size: 28px; color: #9A5508; font-variant-numeric: tabular-nums">−11.25%</b> <span style="font-size: 15px; color: #4F5C57">105,900 դրամ</span></span>
+</div>
+<div role="img" aria-label="Եկամտի 11.25%-ը կորել է վերադարձների պատճառով" style="display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: #D5E0DA">
+<div style="flex: 1"></div>
+<div class="grow-r" style="width: 11.25%; background: #9A5508"></div>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap">
+<span style="font-weight: 600">Շահույթ</span>
+<span><b style="font-size: 28px; color: #9A5508; font-variant-numeric: tabular-nums">−13.75%</b> <span style="font-size: 15px; color: #4F5C57">34,300 դրամ</span></span>
+</div>
+<div role="img" aria-label="Շահույթի 13.75%-ը կորել է վերադարձների պատճառով" style="display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: #D5E0DA">
+<div style="flex: 1"></div>
+<div class="grow-r" style="width: 13.75%; background: #9A5508"></div>
+</div>
+</div>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Շահույթն ավելի է տուժել, քան եկամուտը. վերադարձվել են բարձր մարժայով ապրանքներ։</p>
+</div><div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 52px; font-weight: 700; line-height: 1; color: #9A5508; font-variant-numeric: tabular-nums">87%</div>
+<div style="font-weight: 600; font-size: 18px">վերադարձված գումարի՝ ընդամենը երկու դեպքից</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: center">
+<div role="img" aria-label="Վերադարձված գումարի բաշխում. Բինտ 71%, Վիտամին C 16%, մյուսները 13%" style="display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; max-width: 280px"><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div></div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 15px"><span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 3px; background: #9A5508"></span>Բինտ ստերիլ · 71%</span><span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 3px; background: #C27F33"></span>Վիտամին C · 16%</span><span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 3px; background: #C9D1CC"></span>Մյուս 3 ապրանքը · 13%</span></div>
+</div>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Յուրաքանչյուր քառակուսի՝ վերադարձված 105,900 դրամի 1%-ը։</p>
+</div><div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-wrap: wrap; gap: 28px; align-items: center">
+<div role="img" aria-label="Բժշկական Կենտրոն N1-ի վերադարձի տոկոսը 32.41% է" style="width: 184px; height: 184px; flex: none; border-radius: 50%; background: conic-gradient(#9A5508 0 32.41%, #D5E0DA 32.41% 100%); display: grid; place-items: center">
+<div style="width: 128px; height: 128px; border-radius: 50%; background: #FFFFFF; display: grid; place-items: center; font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums">32.41%</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 180px">
+<div style="font-weight: 600; font-size: 18px">Ամենաբարձր վերադարձի տոկոսը</div>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Բժշկական Կենտրոն N1. ժամկետանց Վիտամին C-ի առաքման պատճառով գնումների մոտ մեկ երրորդը վերադարձվել է։</p>
+</div>
+</div>
+</div><div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 52px; font-weight: 700; line-height: 1; color: #15201C; font-variant-numeric: tabular-nums">100%</div>
+<div style="font-weight: 600; font-size: 18px">Բինտ ստերիլի խմբաքանակից վերադարձվել է</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; align-items: center">
+<span style="font-size: 15px">Վաճառված՝ 500</span>
+<div style="height: 22px; border-radius: 6px; background: #15201C"></div>
+<span style="font-size: 15px">Վերադարձված՝ 500</span>
+<div style="height: 22px; border-radius: 6px; background: #D5E0DA"><div class="grow-l" style="height: 100%; width: 100%; border-radius: 6px; background: #9A5508"></div></div>
+</div>
+</div>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Մեկ գործարք՝ 75,000 դրամ և 25,000 դրամ կորած շահույթ։</p>
+</div></div>
+</section>
+
+<section style="background: #FFFFFF; border-top: 1px solid #DCE2DD; border-bottom: 1px solid #DCE2DD">
+<div style="max-width: 1120px; margin: 0 auto; padding: 80px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 48px">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">01 · ԽՆԴԻՐԸ</div>
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 34px; line-height: 1.25">Ինչ հարցերի էր պետք պատասխանել</h2>
+</div>
+<div style="display: flex; flex-direction: column; gap: 16px; color: #3D4A45">
+<p style="margin: 0">Դեղերի մեծածախ դիստրիբյուտորն ունի մի քանի պահեստ, մանրածախ և մեծածախ հաճախորդներ և գործարքների մանրամասն գրանցում։ Նպատակն էր հասկանալ, թե որտեղից է գալիս շահույթը և որտեղ է այն կորչում։</p>
+<p style="margin: 0">Վերլուծությունը ծածկում է պահեստների արդյունավետությունը, ամենաշահութաբեր ապրանքները, հաճախորդների խմբերի համեմատությունը, ամսական դինամիկան, զեղչերի ազդեցությունը և, ամենամանրամասն, վերադարձների պատճառներն ու հետևանքները։</p>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Տվյալները ուսումնական են, աշխատանքը կատարված է Oracle APEX միջավայրում։</p>
+</div>
+</div>
+</section>
+
+<section style="max-width: 1120px; margin: 0 auto; padding: 80px 24px; display: flex; flex-direction: column; gap: 32px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">02 · ՏՎՅԱԼՆԵՐԻ ՄՈԴԵԼ</div>
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 34px; line-height: 1.25">Հինգ աղյուսակ, մեկ կենտրոն</h2>
+<p style="margin: 0; color: #3D4A45">Գործարքների աղյուսակը կապում է հաճախորդներին և պահեստներին, իսկ մանրամասների աղյուսակը՝ գործարքներին և ապրանքներին։ Յուրաքանչյուր տող պարունակում է գին, ինքնարժեք, զեղչ և շահույթ։</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; line-height: 1.7">
+<div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 12px; overflow: hidden">
+<div style="background: #E8EEEA; padding: 12px 16px; font-weight: 500">P_Warehouses</div>
+<div style="padding: 12px 16px; display: flex; flex-direction: column">
+<span><b style="color: #0F6E5C">PK</b> warehouse_id</span>
+<span>name</span>
+</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 12px; overflow: hidden">
+<div style="background: #E8EEEA; padding: 12px 16px; font-weight: 500">P_Customers</div>
+<div style="padding: 12px 16px; display: flex; flex-direction: column">
+<span><b style="color: #0F6E5C">PK</b> customer_id</span>
+<span>name</span>
+<span>partner_group</span>
+<span>address</span>
+</div>
+</div>
+<div style="background: #FFFFFF; border: 2px solid #15201C; border-radius: 12px; overflow: hidden">
+<div style="background: #15201C; color: #FFFFFF; padding: 12px 16px; font-weight: 500">P_Transactions</div>
+<div style="padding: 12px 16px; display: flex; flex-direction: column">
+<span><b style="color: #0F6E5C">PK</b> transaction_id</span>
+<span><b style="color: #9A5508">FK</b> customer_id</span>
+<span><b style="color: #9A5508">FK</b> warehouse_id</span>
+<span>transaction_type</span>
+<span>transaction_date</span>
+<span>comments</span>
+</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 12px; overflow: hidden">
+<div style="background: #E8EEEA; padding: 12px 16px; font-weight: 500">P_TransactionDetails</div>
+<div style="padding: 12px 16px; display: flex; flex-direction: column">
+<span><b style="color: #0F6E5C">PK</b> detail_id</span>
+<span><b style="color: #9A5508">FK</b> transaction_id</span>
+<span><b style="color: #9A5508">FK</b> product_id</span>
+<span>quantity</span>
+<span>selling_price</span>
+<span>total_amount</span>
+<span>profit</span>
+<span>discount_percentage</span>
+</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 12px; overflow: hidden">
+<div style="background: #E8EEEA; padding: 12px 16px; font-weight: 500">P_Products</div>
+<div style="padding: 12px 16px; display: flex; flex-direction: column">
+<span><b style="color: #0F6E5C">PK</b> product_id</span>
+<span>code</span>
+<span>name</span>
+<span>product_type</span>
+</div>
+</div>
+</div>
+</section>
+
+<section style="background: #FFFFFF; border-top: 1px solid #DCE2DD; border-bottom: 1px solid #DCE2DD">
+<div style="max-width: 1120px; margin: 0 auto; padding: 80px 24px; display: flex; flex-direction: column; gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 760px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">03 · ԳԼԽԱՎՈՐ ՀԵՏԱԶՈՏՈՒԹՅՈՒՆԸ</div>
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 34px; line-height: 1.25">Վերադարձներ. երկու դեպք՝ վերադարձված գումարի 87%-ը</h2>
+<p style="margin: 0; color: #3D4A45">Շահույթի կորստի տոկոսը (13.75%) ավելի բարձր է եկամտի կորստից (11.25%), այսինքն վերադարձվել են համեմատաբար շահութաբեր ապրանքներ։ Կորուստը կենտրոնացած է ընդամենը երկու դեպքում։</p>
+</div>
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 20px" role="img" aria-label="Վերադարձված գումարն ըստ ապրանքի, ընդհանուրը 105,900 դրամ">
+<figcaption style="font-weight: 600">Վերադարձված գումարն ըստ ապրանքի, դրամ</figcaption>
+<div style="display: grid; grid-template-columns: minmax(120px, 180px) minmax(0, 1fr) 150px; gap: 12px 16px; align-items: center; font-size: 15px">
+<span style="font-weight: 600">Բինտ ստերիլ</span>
+<div style="height: 28px; background: #EEF1EE; border-radius: 4px"><div style="width: 100%; height: 100%; background: #9A5508; border-radius: 4px"></div></div>
+<span style="font-variant-numeric: tabular-nums"><b>75,000</b> · 70.8%</span>
+<span style="font-weight: 600">Վիտամին C</span>
+<div style="height: 28px; background: #EEF1EE; border-radius: 4px"><div style="width: 23.3%; height: 100%; background: #9A5508; border-radius: 4px"></div></div>
+<span style="font-variant-numeric: tabular-nums"><b>17,500</b> · 16.5%</span>
+<span>Ամոքսիլ</span>
+<div style="height: 28px; background: #EEF1EE; border-radius: 4px"><div style="width: 12%; height: 100%; background: #8A9690; border-radius: 4px"></div></div>
+<span style="font-variant-numeric: tabular-nums">9,000 · 8.5%</span>
+<span>Ասպիրին</span>
+<div style="height: 28px; background: #EEF1EE; border-radius: 4px"><div style="width: 3.2%; height: 100%; background: #8A9690; border-radius: 4px"></div></div>
+<span style="font-variant-numeric: tabular-nums">2,400 · 2.3%</span>
+<span>Պարացետամոլ</span>
+<div style="height: 28px; background: #EEF1EE; border-radius: 4px"><div style="width: 2.7%; height: 100%; background: #8A9690; border-radius: 4px"></div></div>
+<span style="font-variant-numeric: tabular-nums">2,000 · 1.9%</span>
+</div>
+</figure>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px">
+<div style="background: #F6F7F4; border-radius: 12px; padding: 28px; display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 20px">Բինտ ստերիլ. 100% վերադարձ</h3>
+<p style="margin: 0; color: #3D4A45">Նոր Դեղատունը վերադարձրել է ամբողջ խմբաքանակը՝ 500 հատ։ Կորած շահույթը 25,000 դրամ է։ Ավելին, այս հաճախորդի գնումները բազայում զրո են, այսինքն վերադարձը գրանցված է առանց համապատասխան վաճառքի։ Սա կա՛մ որակի խնդիր է, կա՛մ տվյալների սխալ։</p>
+</div><div style="background: #F6F7F4; border-radius: 12px; padding: 28px; display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 20px">Վիտամին C. ժամկետանց առաքում</h3>
+<p style="margin: 0; color: #3D4A45">Բժշկական Կենտրոն N1-ին առաքվել է ժամկետանց ապրանք (17,500 դրամ)։ Արդյունքում այս հաճախորդն ունի ամենաբարձր վերադարձի տոկոսը՝ 32.41%։ Սա պահեստի կառավարման թերություն է, որը հեշտ է կանխել։</p>
+</div><div style="background: #F6F7F4; border-radius: 12px; padding: 28px; display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 20px">Տվյալների որակ</h3>
+<p style="margin: 0; color: #3D4A45">«Լրիվ վերադարձ» և «Մասնակի վերադարձ» գրառումները պատճառներ չեն, այլ վերադարձի տեսակներ, ուստի ամենամեծ վերադարձների իրական պատճառն անհայտ է։ «Մասամբ» և «Մասնակի» նույն բանն են, բայց գրանցված են առանձին։</p>
+</div>
+</div>
+</div>
+</section>
+
+<section style="max-width: 1120px; margin: 0 auto; padding: 80px 24px; display: flex; flex-direction: column; gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">04 · ԱՌԱՋԱՐԿՆԵՐ</div>
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 34px; line-height: 1.25">Ինչ անել</h2>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px 48px">
+<div style="display: flex; gap: 20px">
+<div style="font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 40px; font-weight: 700; line-height: 1; color: #B8C2BD; min-width: 40px">1</div>
+<div><h3 style="margin: 0 0 6px; font-size: 19px">Պարզել Բինտի դեպքը</h3><p style="margin: 0; color: #3D4A45">Ստուգել խմբաքանակը, որակի խնդրի դեպքում պահանջ ներկայացնել մատակարարին և գտնել բնօրինակ վաճառքի փաստաթուղթը։</p></div>
+</div><div style="display: flex; gap: 20px">
+<div style="font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 40px; font-weight: 700; line-height: 1; color: #B8C2BD; min-width: 40px">2</div>
+<div><h3 style="margin: 0 0 6px; font-size: 19px">Վերահսկել պիտանելիության ժամկետները</h3><p style="margin: 0; color: #3D4A45">Կիրառել «առաջինը լրանում է՝ առաջինը դուրս է գալիս» սկզբունքը, մոտ ժամկետով ապրանքը վաճառել զեղչով։</p></div>
+</div><div style="display: flex; gap: 20px">
+<div style="font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 40px; font-weight: 700; line-height: 1; color: #B8C2BD; min-width: 40px">3</div>
+<div><h3 style="margin: 0 0 6px; font-size: 19px">Ստուգել պատվերները առաքումից առաջ</h3><p style="margin: 0; color: #3D4A45">Հաստատել պատվերը հաճախորդի հետ՝ ապրանքի կոդով և դեղաչափով։</p></div>
+</div><div style="display: flex; gap: 20px">
+<div style="font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 40px; font-weight: 700; line-height: 1; color: #B8C2BD; min-width: 40px">4</div>
+<div><h3 style="margin: 0 0 6px; font-size: 19px">Սահմանել վերադարձի կանոններ</h3><p style="margin: 0; color: #3D4A45">Վերադարձ ընդունել միայն վաճառքի փաստաթղթի հղումով և որոշակի ժամկետում։</p></div>
+</div><div style="display: flex; gap: 20px">
+<div style="font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 40px; font-weight: 700; line-height: 1; color: #B8C2BD; min-width: 40px">5</div>
+<div><h3 style="margin: 0 0 6px; font-size: 19px">Ստանդարտացնել պատճառները</h3><p style="margin: 0; color: #3D4A45">Ազատ տեքստի փոխարեն ընտրովի ցանկ. ժամկետանց, որակի թերություն, վնասված փաթեթ, սխալ առաքում, ավելցուկ գնում։</p></div>
+</div>
+</div>
+</section>
+
+<section style="background: #FFFFFF; border-top: 1px solid #DCE2DD; border-bottom: 1px solid #DCE2DD">
+<div style="max-width: 1120px; margin: 0 auto; padding: 80px 24px; display: flex; flex-direction: column; gap: 32px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">05 · ՄՅՈՒՍ ԱՐԴՅՈՒՆՔՆԵՐԸ</div>
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 34px; line-height: 1.25">Վաճառքի պատկերը</h2>
+</div>
+<div style="background: #F6F7F4; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h3 style="margin: 0; font-size: 22px">Պահեստների արդյունավետություն</h3>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Ընդհանուր վաճառքը՝ 941,000 դրամ, 7 պահեստ, միայն իրացման գործարքներ</p>
+</div>
+<div style="overflow-x: auto">
+<div role="table" aria-label="Պահեստների արդյունավետություն" style="min-width: 680px; display: grid; grid-template-columns: minmax(170px, 1.2fr) minmax(220px, 2.4fr) 80px 96px 110px; gap: 14px 20px; align-items: center; font-size: 15px">
+<span style="font-size: 13px; font-weight: 600; color: #4F5C57; padding-bottom: 8px; border-bottom: 1px solid #DCE2DD">Պահեստ</span>
+<span style="font-size: 13px; font-weight: 600; color: #4F5C57; padding-bottom: 8px; border-bottom: 1px solid #DCE2DD">Վաճառք, դրամ</span>
+<span style="font-size: 13px; font-weight: 600; color: #4F5C57; padding-bottom: 8px; border-bottom: 1px solid #DCE2DD">Մարժա</span>
+<span style="font-size: 13px; font-weight: 600; color: #4F5C57; padding-bottom: 8px; border-bottom: 1px solid #DCE2DD">Գործարքներ</span>
+<span style="font-size: 13px; font-weight: 600; color: #4F5C57; padding-bottom: 8px; border-bottom: 1px solid #DCE2DD">Միջին գործարք</span>
+<span style="font-weight: 600">Արտահանման պահեստ</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 100.0%; height: 100%; background: #9A5508; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">300,000</span></div>
+<span style="font-weight: 600; color: #9A5508; font-variant-numeric: tabular-nums">20%</span>
+<span style="font-variant-numeric: tabular-nums">1</span>
+<span style="font-variant-numeric: tabular-nums">300,000</span>
+<span style="font-weight: 600">Կենտրոնական պահեստ</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 55.7%; height: 100%; background: #0F6E5C; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">167,000</span></div>
+<span style="font-weight: 600; color: #15201C; font-variant-numeric: tabular-nums">30.84%</span>
+<span style="font-variant-numeric: tabular-nums">3</span>
+<span style="font-variant-numeric: tabular-nums">55,667</span>
+<span style="font-weight: 600">Հումքի պահեստ N2</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 50.0%; height: 100%; background: #0F6E5C; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">150,000</span></div>
+<span style="font-weight: 600; color: #0F6E5C; font-variant-numeric: tabular-nums">33.33%</span>
+<span style="font-variant-numeric: tabular-nums">1</span>
+<span style="font-variant-numeric: tabular-nums">150,000</span>
+<span style="font-weight: 600">Կարանտինի պահեստ</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 40.0%; height: 100%; background: #0F6E5C; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">120,000</span></div>
+<span style="font-weight: 600; color: #15201C; font-variant-numeric: tabular-nums">25%</span>
+<span style="font-variant-numeric: tabular-nums">1</span>
+<span style="font-variant-numeric: tabular-nums">120,000</span>
+<span style="font-weight: 600">Սառնարանային պահեստ</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 26.7%; height: 100%; background: #0F6E5C; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">80,000</span></div>
+<span style="font-weight: 600; color: #15201C; font-variant-numeric: tabular-nums">25%</span>
+<span style="font-variant-numeric: tabular-nums">1</span>
+<span style="font-variant-numeric: tabular-nums">80,000</span>
+<span style="font-weight: 600">Պատրաստի դեղերի պահեստ</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 23.3%; height: 100%; background: #0F6E5C; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">70,000</span></div>
+<span style="font-weight: 600; color: #15201C; font-variant-numeric: tabular-nums">28.57%</span>
+<span style="font-variant-numeric: tabular-nums">1</span>
+<span style="font-variant-numeric: tabular-nums">70,000</span>
+<span style="font-weight: 600">Մասնաճյուղ N1</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 18.0%; height: 100%; background: #0F6E5C; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">54,000</span></div>
+<span style="font-weight: 600; color: #0F6E5C; font-variant-numeric: tabular-nums">33.33%</span>
+<span style="font-variant-numeric: tabular-nums">1</span>
+<span style="font-variant-numeric: tabular-nums">54,000</span>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 24px; border-top: 1px solid #DCE2DD; padding-top: 24px"><div style="display: flex; flex-direction: column; gap: 8px"><h4 style="margin: 0; font-size: 18px">Ամենամեծը՝ ամենացածր մարժայով</h4><p style="margin: 0; color: #3D4A45; font-size: 16px">Արտահանման պահեստը տալիս է վաճառքի 32%-ը, բայց ունի ամենացածր մարժան՝ 20%։ Շահույթով (մոտ 60,000) այն դեռ առաջինն է, սակայն Կենտրոնականը գրեթե երկու անգամ փոքր վաճառքով բերել է մոտ 51,500։</p></div><div style="display: flex; flex-direction: column; gap: 8px"><h4 style="margin: 0; font-size: 18px">Համեմատության սահմանը</h4><p style="margin: 0; color: #3D4A45; font-size: 16px">Միայն Կենտրոնական պահեստն ունի մեկից ավելի գործարք (3)։ Մնացած 6-ի համար միջին գործարքը հավասար է ընդհանուր վաճառքին, ուստի եզրակացությունները նախնական են։</p></div><div style="display: flex; flex-direction: column; gap: 8px"><h4 style="margin: 0; font-size: 18px">Ստուգման արժանի</h4><p style="margin: 0; color: #3D4A45; font-size: 16px">Վաճառք է գրանցված Կարանտինի և Հումքի պահեստներից (միասին 270,000)։ Կարանտինը սովորաբար ստուգման սպասող ապրանքի համար է, ուստի արժե ճշտել՝ սա գործընթացի՞, թե՞ գրանցման խնդիր է։</p></div></div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 20px; align-items: start">
+<div style="background: #F6F7F4; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h3 style="margin: 0; font-size: 22px">Հունվարյան վաճառքը՝ ըստ տարիների</h3>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Տվյալները պարունակում են միայն երեք ամիս՝ 2024, 2025 և 2026 թվականների հունվարները, դրամ</p>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px"><span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 3px; background: #5E9C8C"></span>Վաճառք</span><span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 3px; background: #0F4D40"></span>Շահույթ (վաճառքի մաս)</span></div>
+<div role="img" aria-label="Հունվարյան վաճառք. 2024՝ 720,000, 2025՝ 129,000, 2026՝ 92,000 դրամ" style="display: flex; gap: 20px; align-items: flex-end">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; min-width: 0">
+<span style="font-weight: 700; font-variant-numeric: tabular-nums">720,000</span>
+<div style="height: 220px; width: 100%; max-width: 96px; display: flex; align-items: flex-end">
+<div class="grow-y" style="width: 100%; height: 100.0%; background: #5E9C8C; border-radius: 6px 6px 0 0; display: flex; align-items: flex-end; overflow: hidden">
+<div style="width: 100%; height: 25.0%; background: #0F4D40"></div>
+</div>
+</div>
+<span style="font-size: 15px; font-weight: 600">Հունվ. 2024</span>
+<span style="font-size: 14px; color: #4F5C57; font-variant-numeric: tabular-nums">Շահույթ՝ 180,000</span>
+<span style="font-size: 14px; font-weight: 600; color: #0F6E5C">Մարժա՝ 25%</span>
+</div><div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; min-width: 0">
+<span style="font-weight: 700; font-variant-numeric: tabular-nums">129,000</span>
+<div style="height: 220px; width: 100%; max-width: 96px; display: flex; align-items: flex-end">
+<div class="grow-y" style="width: 100%; height: 17.9%; background: #5E9C8C; border-radius: 6px 6px 0 0; display: flex; align-items: flex-end; overflow: hidden">
+<div style="width: 100%; height: 33.3%; background: #0F4D40"></div>
+</div>
+</div>
+<span style="font-size: 15px; font-weight: 600">Հունվ. 2025</span>
+<span style="font-size: 14px; color: #4F5C57; font-variant-numeric: tabular-nums">Շահույթ՝ 43,000</span>
+<span style="font-size: 14px; font-weight: 600; color: #0F6E5C">Մարժա՝ 33.3%</span>
+</div><div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; min-width: 0">
+<span style="font-weight: 700; font-variant-numeric: tabular-nums">92,000</span>
+<div style="height: 220px; width: 100%; max-width: 96px; display: flex; align-items: flex-end">
+<div class="grow-y" style="width: 100%; height: 12.8%; background: #5E9C8C; border-radius: 6px 6px 0 0; display: flex; align-items: flex-end; overflow: hidden">
+<div style="width: 100%; height: 28.8%; background: #0F4D40"></div>
+</div>
+</div>
+<span style="font-size: 15px; font-weight: 600">Հունվ. 2026</span>
+<span style="font-size: 14px; color: #4F5C57; font-variant-numeric: tabular-nums">Շահույթ՝ 26,500</span>
+<span style="font-size: 14px; font-weight: 600; color: #0F6E5C">Մարժա՝ 28.8%</span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 18px; border-top: 1px solid #DCE2DD; padding-top: 20px"><div style="display: flex; flex-direction: column; gap: 6px"><h4 style="margin: 0; font-size: 17px">Ծավալը կտրուկ նվազել է</h4><p style="margin: 0; color: #3D4A45; font-size: 15px">720,000-ից 129,000 (−82%), հետո 92,000 (−29%)։</p></div><div style="display: flex; flex-direction: column; gap: 6px"><h4 style="margin: 0; font-size: 17px">Մարժան, սակայն, աճել է</h4><p style="margin: 0; color: #3D4A45; font-size: 15px">25%-ից 33.3%, հետո 28.8%. ավելի քիչ վաճառք, բայց յուրաքանչյուր դրամն ավելի շահութաբեր։</p></div><div style="display: flex; flex-direction: column; gap: 6px"><h4 style="margin: 0; font-size: 17px">Միտում չէ, երեք կետ է</h4><p style="margin: 0; color: #3D4A45; font-size: 15px">Յուրաքանչյուր տարվա համար կա միայն հունվարը, ուստի իրական միտումը գնահատելու համար պետք են բոլոր ամիսների տվյալները։</p></div></div>
+</div>
+<div style="background: #F6F7F4; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h3 style="margin: 0; font-size: 22px">Զեղչերի ազդեցությունը</h3>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Գործարքի տողերի քանակը՝ ըստ զեղչի խմբի</p>
+</div>
+<div role="img" aria-label="Բոլոր 10 տողը առանց զեղչի խմբում են, մյուս խմբերում՝ 0" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px"><div style="display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 10px; background: #15201C; color: #FFFFFF; border: 1px solid #15201C"><span style="font-size: 14px">Առանց զեղչի</span><span style="font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums">10</span></div><div style="display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 10px; background: #FFFFFF; color: #4F5C57; border: 1px solid #DCE2DD"><span style="font-size: 14px">1–5%</span><span style="font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums">0</span></div><div style="display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 10px; background: #FFFFFF; color: #4F5C57; border: 1px solid #DCE2DD"><span style="font-size: 14px">5–10%</span><span style="font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums">0</span></div><div style="display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 10px; background: #FFFFFF; color: #4F5C57; border: 1px solid #DCE2DD"><span style="font-size: 14px">10%-ից ավելի</span><span style="font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums">0</span></div></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px"><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums">1,590</span><span style="font-size: 14px; color: #4F5C57">վաճառված հատ</span></div><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums">26.51%</span><span style="font-size: 14px; color: #4F5C57">մարժա, բազային մակարդակ</span></div></div>
+<div style="display: flex; flex-direction: column; gap: 18px; border-top: 1px solid #DCE2DD; padding-top: 20px"><div style="display: flex; flex-direction: column; gap: 6px"><h4 style="margin: 0; font-size: 17px">Զեղչեր չեն գրանցվել</h4><p style="margin: 0; color: #3D4A45; font-size: 15px">Բոլոր 10 վաճառքի տողերն առանց զեղչի են, ուստի զեղչի ազդեցությունն այս տվյալներով հնարավոր չէ չափել։ Սա նույնպես արդյունք է. 26.51% մարժան մաքուր բազային մակարդակ է։</p></div><div style="display: flex; flex-direction: column; gap: 6px"><h4 style="margin: 0; font-size: 17px">Հաջորդ քայլը</h4><p style="margin: 0; color: #3D4A45; font-size: 15px">Ստուգել initial_price և selling_price դաշտերը. եթե դրանք տարբերվում են, զեղչը կարող է թաքնված լինել գնի մեջ, ոչ թե discount_percentage դաշտում։ Հարցումը պատրաստ է աշխատելու, երբ զեղչերով տվյալներ հայտնվեն։</p></div></div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="sql-hy" style="max-width: 1120px; margin: 0 auto; padding: 80px 24px; display: flex; flex-direction: column; gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">06 · ԸՆՏՐՎԱԾ SQL</div>
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 34px; line-height: 1.25">Ինչպես է հաշվված</h2>
+<p style="margin: 0; color: #3D4A45">Ստորև երեք հարցում, որոնք ցույց են տալիս տարբեր տեխնիկաներ։</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline">
+<h3 style="margin: 0; font-size: 20px">Ամենամեծ գործարքը յուրաքանչյուր հաճախորդի համար</h3>
+<span style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 13px; color: #0F6E5C">KEEP (DENSE_RANK FIRST)</span>
+</div>
+<p style="margin: 0; color: #3D4A45">Մեկ անցումով գտնում է և՛ առավելագույն գումարը, և՛ այդ գործարքի ամսաթիվը՝ առանց լրացուցիչ join-ի։</p>
+<div style="overflow-x: auto; background: #14201C; border-radius: 12px">
+<pre style="margin: 0; padding: 24px; color: #E4ECE8; font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; line-height: 1.6">SELECT
+    C.name AS customer_name,
+    MAX(TX.total_amount) AS max_transaction_amount,
+    MAX(TX.transaction_date) KEEP (DENSE_RANK FIRST ORDER BY TX.total_amount DESC) AS transaction_date
+FROM (
+    SELECT T.customer_id, T.transaction_date,
+           SUM(D.total_amount) AS total_amount
+    FROM P_Transactions T
+    JOIN P_TransactionDetails D ON D.transaction_id = T.transaction_id
+    WHERE T.transaction_type = 'Իրացում'
+    GROUP BY T.customer_id, T.transaction_id, T.transaction_date
+) TX
+JOIN P_Customers C ON C.customer_id = TX.customer_id
+GROUP BY C.customer_id, C.name
+ORDER BY max_transaction_amount DESC;</pre>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline">
+<h3 style="margin: 0; font-size: 20px">Միջինից թանկ ապրանքներ</h3>
+<span style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 13px; color: #0F6E5C">AVG(AVG()) OVER ()</span>
+</div>
+<p style="margin: 0; color: #3D4A45">Window ֆունկցիան ագրեգատի վրա տալիս է ապրանքների միջին գների միջինը նույն հարցման մեջ, այնպես որ յուրաքանչյուր ապրանք ունի հավասար կշիռ՝ անկախ վաճառքի քանակից։</p>
+<div style="overflow-x: auto; background: #14201C; border-radius: 12px">
+<pre style="margin: 0; padding: 24px; color: #E4ECE8; font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; line-height: 1.6">SELECT code, name, avg_selling_price, overall_avg_price
+FROM (
+    SELECT
+        P.code,
+        P.name,
+        ROUND(AVG(D.selling_price), 2) AS avg_selling_price,
+        ROUND(AVG(AVG(D.selling_price)) OVER (), 2) AS overall_avg_price
+    FROM P_TransactionDetails D
+    JOIN P_Transactions T ON T.transaction_id = D.transaction_id
+    JOIN P_Products P ON P.product_id = D.product_id
+    WHERE T.transaction_type = 'Իրացում'
+    GROUP BY P.product_id, P.code, P.name
+)
+WHERE avg_selling_price &gt; overall_avg_price
+ORDER BY avg_selling_price DESC;</pre>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline">
+<h3 style="margin: 0; font-size: 20px">Զեղչի ազդեցությունը շահութաբերության վրա</h3>
+<span style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 13px; color: #0F6E5C">CASE · NULLIF · սեփական հարց</span>
+</div>
+<p style="margin: 0; color: #3D4A45">Իմ ձևակերպած հարցը. գործարքի տողերը բաժանվում են զեղչի խմբերի, իսկ NULLIF-ը պաշտպանում է զրոյի բաժանումից։</p>
+<div style="overflow-x: auto; background: #14201C; border-radius: 12px">
+<pre style="margin: 0; padding: 24px; color: #E4ECE8; font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; line-height: 1.6">SELECT
+    CASE
+        WHEN NVL(D.discount_percentage, 0) = 0 THEN '1. Առանց զեղչի'
+        WHEN D.discount_percentage &lt;= 5 THEN '2. 1-5%'
+        WHEN D.discount_percentage &lt;= 10 THEN '3. 5-10%'
+        ELSE '4. 10%-ից ավելի'
+    END AS discount_group,
+    COUNT(*) AS lines_count,
+    SUM(D.quantity) AS total_quantity,
+    SUM(D.total_amount) AS total_sales,
+    SUM(D.profit) AS total_profit,
+    ROUND(SUM(D.profit) / NULLIF(SUM(D.total_amount), 0) * 100, 2) AS avg_margin_pct
+FROM P_TransactionDetails D
+JOIN P_Transactions T ON T.transaction_id = D.transaction_id
+WHERE T.transaction_type = 'Իրացում'
+GROUP BY
+    CASE
+        WHEN NVL(D.discount_percentage, 0) = 0 THEN '1. Առանց զեղչի'
+        WHEN D.discount_percentage &lt;= 5 THEN '2. 1-5%'
+        WHEN D.discount_percentage &lt;= 10 THEN '3. 5-10%'
+        ELSE '4. 10%-ից ավելի'
+    END
+ORDER BY discount_group;</pre>
+</div>
+</div>
+</section>
+
+<section style="background: #15201C; color: #E4ECE8">
+<div style="max-width: 1120px; margin: 0 auto; padding: 72px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 30px; color: #FFFFFF">Հմտություններ</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px">
+<span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">Oracle SQL</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">JOIN-ներ</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">Ագրեգացիա</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">Window ֆունկցիաներ</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">Ենթահարցումներ</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">CASE pivot</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">Տվյալների որակի ստուգում</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">Բիզնես առաջարկներ</span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 30px; color: #FFFFFF">Կապ</h2>
+<p style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Զարուհի Դանիելյան</p>
+<p style="margin: 0">Էլ. փոստ՝ <a href="mailto:zaruhidanielyan.1@gmail.com" style="color: #9FD8C8">zaruhidanielyan.1@gmail.com</a></p>
+<p style="margin: 0">LinkedIn՝ <a href="https://www.linkedin.com/in/zaruhi-danielyan" style="color: #9FD8C8">linkedin.com/in/zaruhi-danielyan</a></p>
+</div>
+</div>
+</section>
+</div>
+<div lang="en" data-lang="en" hidden>
+<section style="max-width: 1120px; margin: 0 auto; padding: 80px 24px 64px; display: flex; flex-direction: column; gap: 24px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">ORACLE SQL · APEX · BUSINESS ANALYSIS</div>
+<h1 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-weight: 700; font-size: clamp(36px, 5vw, 60px); line-height: 1.15; max-width: 920px">Sales and Returns Analysis: Pharmaceutical Distributor</h1>
+<p style="margin: 0; font-size: 20px; color: #3D4A45; max-width: 760px">Twelve business questions answered on a five-table sales database, from warehouse performance to the impact of discounts. The key finding: returns wiped out 13.75% of profit, and most of that loss was preventable.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px">
+<a href="#sql-en" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 24px; background: #15201C; color: #FFFFFF; text-decoration: none; border-radius: 8px; font-weight: 600">View the SQL</a>
+<a href="https://www.linkedin.com/in/zaruhi-danielyan" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 24px; border: 1px solid #15201C; color: #15201C; text-decoration: none; border-radius: 8px; font-weight: 600">LinkedIn</a>
+</div>
+</section>
+
+<section style="max-width: 1120px; margin: 0 auto; padding: 0 24px 80px">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 20px"><div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+<h3 style="margin: 0; font-size: 22px">Impact of returns</h3>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap">
+<span style="font-weight: 600">Revenue</span>
+<span><b style="font-size: 28px; color: #9A5508; font-variant-numeric: tabular-nums">−11.25%</b> <span style="font-size: 15px; color: #4F5C57">AMD 105,900</span></span>
+</div>
+<div role="img" aria-label="11.25% of revenue lost to returns" style="display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: #D5E0DA">
+<div style="flex: 1"></div>
+<div class="grow-r" style="width: 11.25%; background: #9A5508"></div>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap">
+<span style="font-weight: 600">Profit</span>
+<span><b style="font-size: 28px; color: #9A5508; font-variant-numeric: tabular-nums">−13.75%</b> <span style="font-size: 15px; color: #4F5C57">AMD 34,300</span></span>
+</div>
+<div role="img" aria-label="13.75% of profit lost to returns" style="display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: #D5E0DA">
+<div style="flex: 1"></div>
+<div class="grow-r" style="width: 13.75%; background: #9A5508"></div>
+</div>
+</div>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Profit took a bigger hit than revenue: the returned goods were high-margin.</p>
+</div><div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 52px; font-weight: 700; line-height: 1; color: #9A5508; font-variant-numeric: tabular-nums">87%</div>
+<div style="font-weight: 600; font-size: 18px">of the returned amount came from just two cases</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: center">
+<div role="img" aria-label="Returned amount split: bandage 71%, Vitamin C 16%, others 13%" style="display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; max-width: 280px"><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #9A5508"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C27F33"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div><div style="aspect-ratio: 1; border-radius: 3px; background: #C9D1CC"></div></div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 15px"><span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 3px; background: #9A5508"></span>Sterile bandage · 71%</span><span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 3px; background: #C27F33"></span>Vitamin C · 16%</span><span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 3px; background: #C9D1CC"></span>Other 3 products · 13%</span></div>
+</div>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Each square is 1% of the AMD 105,900 returned.</p>
+</div><div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-wrap: wrap; gap: 28px; align-items: center">
+<div role="img" aria-label="Medical Center N1 return rate is 32.41%" style="width: 184px; height: 184px; flex: none; border-radius: 50%; background: conic-gradient(#9A5508 0 32.41%, #D5E0DA 32.41% 100%); display: grid; place-items: center">
+<div style="width: 128px; height: 128px; border-radius: 50%; background: #FFFFFF; display: grid; place-items: center; font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums">32.41%</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 180px">
+<div style="font-weight: 600; font-size: 18px">Highest customer return rate</div>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Medical Center N1: after an expired Vitamin C delivery, nearly a third of its purchases came back.</p>
+</div>
+</div>
+</div><div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 52px; font-weight: 700; line-height: 1; color: #15201C; font-variant-numeric: tabular-nums">100%</div>
+<div style="font-weight: 600; font-size: 18px">of the sterile bandage batch was returned</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; align-items: center">
+<span style="font-size: 15px">Sold: 500</span>
+<div style="height: 22px; border-radius: 6px; background: #15201C"></div>
+<span style="font-size: 15px">Returned: 500</span>
+<div style="height: 22px; border-radius: 6px; background: #D5E0DA"><div class="grow-l" style="height: 100%; width: 100%; border-radius: 6px; background: #9A5508"></div></div>
+</div>
+</div>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">One transaction: AMD 75,000 in sales and AMD 25,000 in lost profit.</p>
+</div></div>
+</section>
+
+<section style="background: #FFFFFF; border-top: 1px solid #DCE2DD; border-bottom: 1px solid #DCE2DD">
+<div style="max-width: 1120px; margin: 0 auto; padding: 80px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 48px">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">01 · THE PROBLEM</div>
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 34px; line-height: 1.25">The questions that needed answers</h2>
+</div>
+<div style="display: flex; flex-direction: column; gap: 16px; color: #3D4A45">
+<p style="margin: 0">A pharmaceutical wholesaler runs several warehouses, serves retail and wholesale customers, and records every transaction line in detail. The goal was to understand where profit comes from and where it leaks.</p>
+<p style="margin: 0">The analysis covers warehouse performance, the most profitable products, customer-segment comparison, monthly trends, the effect of discounts and, in most depth, the causes and consequences of returns.</p>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Educational dataset; the work was done in Oracle APEX.</p>
+</div>
+</div>
+</section>
+
+<section style="max-width: 1120px; margin: 0 auto; padding: 80px 24px; display: flex; flex-direction: column; gap: 32px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">02 · DATA MODEL</div>
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 34px; line-height: 1.25">Five tables, one hub</h2>
+<p style="margin: 0; color: #3D4A45">The transactions table links customers and warehouses; the details table links transactions and products. Every line carries price, cost, discount and profit.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; line-height: 1.7">
+<div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 12px; overflow: hidden">
+<div style="background: #E8EEEA; padding: 12px 16px; font-weight: 500">P_Warehouses</div>
+<div style="padding: 12px 16px; display: flex; flex-direction: column">
+<span><b style="color: #0F6E5C">PK</b> warehouse_id</span>
+<span>name</span>
+</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 12px; overflow: hidden">
+<div style="background: #E8EEEA; padding: 12px 16px; font-weight: 500">P_Customers</div>
+<div style="padding: 12px 16px; display: flex; flex-direction: column">
+<span><b style="color: #0F6E5C">PK</b> customer_id</span>
+<span>name</span>
+<span>partner_group</span>
+<span>address</span>
+</div>
+</div>
+<div style="background: #FFFFFF; border: 2px solid #15201C; border-radius: 12px; overflow: hidden">
+<div style="background: #15201C; color: #FFFFFF; padding: 12px 16px; font-weight: 500">P_Transactions</div>
+<div style="padding: 12px 16px; display: flex; flex-direction: column">
+<span><b style="color: #0F6E5C">PK</b> transaction_id</span>
+<span><b style="color: #9A5508">FK</b> customer_id</span>
+<span><b style="color: #9A5508">FK</b> warehouse_id</span>
+<span>transaction_type</span>
+<span>transaction_date</span>
+<span>comments</span>
+</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 12px; overflow: hidden">
+<div style="background: #E8EEEA; padding: 12px 16px; font-weight: 500">P_TransactionDetails</div>
+<div style="padding: 12px 16px; display: flex; flex-direction: column">
+<span><b style="color: #0F6E5C">PK</b> detail_id</span>
+<span><b style="color: #9A5508">FK</b> transaction_id</span>
+<span><b style="color: #9A5508">FK</b> product_id</span>
+<span>quantity</span>
+<span>selling_price</span>
+<span>total_amount</span>
+<span>profit</span>
+<span>discount_percentage</span>
+</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DD; border-radius: 12px; overflow: hidden">
+<div style="background: #E8EEEA; padding: 12px 16px; font-weight: 500">P_Products</div>
+<div style="padding: 12px 16px; display: flex; flex-direction: column">
+<span><b style="color: #0F6E5C">PK</b> product_id</span>
+<span>code</span>
+<span>name</span>
+<span>product_type</span>
+</div>
+</div>
+</div>
+</section>
+
+<section style="background: #FFFFFF; border-top: 1px solid #DCE2DD; border-bottom: 1px solid #DCE2DD">
+<div style="max-width: 1120px; margin: 0 auto; padding: 80px 24px; display: flex; flex-direction: column; gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 760px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">03 · KEY INVESTIGATION</div>
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 34px; line-height: 1.25">Returns: two cases, 87% of the returned amount</h2>
+<p style="margin: 0; color: #3D4A45">The share of profit lost (13.75%) is higher than the share of revenue lost (11.25%), meaning the returned goods were relatively high-margin. The losses are concentrated in just two cases.</p>
+</div>
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 20px" role="img" aria-label="Returned amount by product, total AMD 105,900">
+<figcaption style="font-weight: 600">Returned amount by product, AMD</figcaption>
+<div style="display: grid; grid-template-columns: minmax(120px, 180px) minmax(0, 1fr) 150px; gap: 12px 16px; align-items: center; font-size: 15px">
+<span style="font-weight: 600">Sterile bandage</span>
+<div style="height: 28px; background: #EEF1EE; border-radius: 4px"><div style="width: 100%; height: 100%; background: #9A5508; border-radius: 4px"></div></div>
+<span style="font-variant-numeric: tabular-nums"><b>75,000</b> · 70.8%</span>
+<span style="font-weight: 600">Vitamin C</span>
+<div style="height: 28px; background: #EEF1EE; border-radius: 4px"><div style="width: 23.3%; height: 100%; background: #9A5508; border-radius: 4px"></div></div>
+<span style="font-variant-numeric: tabular-nums"><b>17,500</b> · 16.5%</span>
+<span>Amoxil</span>
+<div style="height: 28px; background: #EEF1EE; border-radius: 4px"><div style="width: 12%; height: 100%; background: #8A9690; border-radius: 4px"></div></div>
+<span style="font-variant-numeric: tabular-nums">9,000 · 8.5%</span>
+<span>Aspirin</span>
+<div style="height: 28px; background: #EEF1EE; border-radius: 4px"><div style="width: 3.2%; height: 100%; background: #8A9690; border-radius: 4px"></div></div>
+<span style="font-variant-numeric: tabular-nums">2,400 · 2.3%</span>
+<span>Paracetamol</span>
+<div style="height: 28px; background: #EEF1EE; border-radius: 4px"><div style="width: 2.7%; height: 100%; background: #8A9690; border-radius: 4px"></div></div>
+<span style="font-variant-numeric: tabular-nums">2,000 · 1.9%</span>
+</div>
+</figure>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px">
+<div style="background: #F6F7F4; border-radius: 12px; padding: 28px; display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 20px">Sterile bandage: 100% returned</h3>
+<p style="margin: 0; color: #3D4A45">Nor Deghatun pharmacy returned the entire batch of 500 units, costing AMD 25,000 in profit. On top of that, this customer has zero recorded purchases, so the return was logged without a matching sale: either a quality problem or a data error.</p>
+</div><div style="background: #F6F7F4; border-radius: 12px; padding: 28px; display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 20px">Vitamin C: expired delivery</h3>
+<p style="margin: 0; color: #3D4A45">Medical Center N1 received expired stock (AMD 17,500), which gave this customer the highest return rate at 32.41%. It is a warehouse-management gap that is easy to prevent.</p>
+</div><div style="background: #F6F7F4; border-radius: 12px; padding: 28px; display: flex; flex-direction: column; gap: 10px">
+<h3 style="margin: 0; font-size: 20px">Data quality</h3>
+<p style="margin: 0; color: #3D4A45">“Full return” and “Partial return” are return types, not reasons, so the real cause of the largest returns is unknown. “Partly” and “Partial” mean the same thing but are recorded separately.</p>
+</div>
+</div>
+</div>
+</section>
+
+<section style="max-width: 1120px; margin: 0 auto; padding: 80px 24px; display: flex; flex-direction: column; gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">04 · RECOMMENDATIONS</div>
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 34px; line-height: 1.25">What to do</h2>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px 48px">
+<div style="display: flex; gap: 20px">
+<div style="font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 40px; font-weight: 700; line-height: 1; color: #B8C2BD; min-width: 40px">1</div>
+<div><h3 style="margin: 0 0 6px; font-size: 19px">Investigate the bandage case</h3><p style="margin: 0; color: #3D4A45">Inspect the batch, file a claim with the supplier if quality is at fault, and locate the original sales document.</p></div>
+</div><div style="display: flex; gap: 20px">
+<div style="font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 40px; font-weight: 700; line-height: 1; color: #B8C2BD; min-width: 40px">2</div>
+<div><h3 style="margin: 0 0 6px; font-size: 19px">Control expiry dates</h3><p style="margin: 0; color: #3D4A45">Apply first-expired, first-out (FEFO) and sell near-expiry stock at a discount.</p></div>
+</div><div style="display: flex; gap: 20px">
+<div style="font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 40px; font-weight: 700; line-height: 1; color: #B8C2BD; min-width: 40px">3</div>
+<div><h3 style="margin: 0 0 6px; font-size: 19px">Verify orders before shipping</h3><p style="margin: 0; color: #3D4A45">Confirm each order with the customer by product code and dosage.</p></div>
+</div><div style="display: flex; gap: 20px">
+<div style="font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 40px; font-weight: 700; line-height: 1; color: #B8C2BD; min-width: 40px">4</div>
+<div><h3 style="margin: 0 0 6px; font-size: 19px">Set clear return rules</h3><p style="margin: 0; color: #3D4A45">Accept returns only with a reference to the sales document and within a set period.</p></div>
+</div><div style="display: flex; gap: 20px">
+<div style="font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 40px; font-weight: 700; line-height: 1; color: #B8C2BD; min-width: 40px">5</div>
+<div><h3 style="margin: 0 0 6px; font-size: 19px">Standardize return reasons</h3><p style="margin: 0; color: #3D4A45">Replace free text with a pick list: expired, quality defect, damaged packaging, wrong delivery, overstock.</p></div>
+</div>
+</div>
+</section>
+
+<section style="background: #FFFFFF; border-top: 1px solid #DCE2DD; border-bottom: 1px solid #DCE2DD">
+<div style="max-width: 1120px; margin: 0 auto; padding: 80px 24px; display: flex; flex-direction: column; gap: 32px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">05 · MORE RESULTS</div>
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 34px; line-height: 1.25">The sales picture</h2>
+</div>
+<div style="background: #F6F7F4; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h3 style="margin: 0; font-size: 22px">Warehouse performance</h3>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Total sales AMD 941,000 across 7 warehouses, sales transactions only</p>
+</div>
+<div style="overflow-x: auto">
+<div role="table" aria-label="Warehouse performance" style="min-width: 680px; display: grid; grid-template-columns: minmax(170px, 1.2fr) minmax(220px, 2.4fr) 80px 96px 110px; gap: 14px 20px; align-items: center; font-size: 15px">
+<span style="font-size: 13px; font-weight: 600; color: #4F5C57; padding-bottom: 8px; border-bottom: 1px solid #DCE2DD">Warehouse</span>
+<span style="font-size: 13px; font-weight: 600; color: #4F5C57; padding-bottom: 8px; border-bottom: 1px solid #DCE2DD">Sales, AMD</span>
+<span style="font-size: 13px; font-weight: 600; color: #4F5C57; padding-bottom: 8px; border-bottom: 1px solid #DCE2DD">Margin</span>
+<span style="font-size: 13px; font-weight: 600; color: #4F5C57; padding-bottom: 8px; border-bottom: 1px solid #DCE2DD">Transactions</span>
+<span style="font-size: 13px; font-weight: 600; color: #4F5C57; padding-bottom: 8px; border-bottom: 1px solid #DCE2DD">Avg. transaction</span>
+<span style="font-weight: 600">Export warehouse</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 100.0%; height: 100%; background: #9A5508; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">300,000</span></div>
+<span style="font-weight: 600; color: #9A5508; font-variant-numeric: tabular-nums">20%</span>
+<span style="font-variant-numeric: tabular-nums">1</span>
+<span style="font-variant-numeric: tabular-nums">300,000</span>
+<span style="font-weight: 600">Central warehouse</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 55.7%; height: 100%; background: #0F6E5C; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">167,000</span></div>
+<span style="font-weight: 600; color: #15201C; font-variant-numeric: tabular-nums">30.84%</span>
+<span style="font-variant-numeric: tabular-nums">3</span>
+<span style="font-variant-numeric: tabular-nums">55,667</span>
+<span style="font-weight: 600">Raw materials warehouse N2</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 50.0%; height: 100%; background: #0F6E5C; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">150,000</span></div>
+<span style="font-weight: 600; color: #0F6E5C; font-variant-numeric: tabular-nums">33.33%</span>
+<span style="font-variant-numeric: tabular-nums">1</span>
+<span style="font-variant-numeric: tabular-nums">150,000</span>
+<span style="font-weight: 600">Quarantine warehouse</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 40.0%; height: 100%; background: #0F6E5C; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">120,000</span></div>
+<span style="font-weight: 600; color: #15201C; font-variant-numeric: tabular-nums">25%</span>
+<span style="font-variant-numeric: tabular-nums">1</span>
+<span style="font-variant-numeric: tabular-nums">120,000</span>
+<span style="font-weight: 600">Cold-storage warehouse</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 26.7%; height: 100%; background: #0F6E5C; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">80,000</span></div>
+<span style="font-weight: 600; color: #15201C; font-variant-numeric: tabular-nums">25%</span>
+<span style="font-variant-numeric: tabular-nums">1</span>
+<span style="font-variant-numeric: tabular-nums">80,000</span>
+<span style="font-weight: 600">Finished-goods warehouse</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 23.3%; height: 100%; background: #0F6E5C; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">70,000</span></div>
+<span style="font-weight: 600; color: #15201C; font-variant-numeric: tabular-nums">28.57%</span>
+<span style="font-variant-numeric: tabular-nums">1</span>
+<span style="font-variant-numeric: tabular-nums">70,000</span>
+<span style="font-weight: 600">Branch N1</span>
+<div style="display: flex; align-items: center; gap: 12px"><div style="flex: 1; height: 22px; background: #EEF1EE; border-radius: 4px"><div class="grow-l" style="width: 18.0%; height: 100%; background: #0F6E5C; border-radius: 4px"></div></div><span style="min-width: 72px; text-align: right; font-variant-numeric: tabular-nums">54,000</span></div>
+<span style="font-weight: 600; color: #0F6E5C; font-variant-numeric: tabular-nums">33.33%</span>
+<span style="font-variant-numeric: tabular-nums">1</span>
+<span style="font-variant-numeric: tabular-nums">54,000</span>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 24px; border-top: 1px solid #DCE2DD; padding-top: 24px"><div style="display: flex; flex-direction: column; gap: 8px"><h4 style="margin: 0; font-size: 18px">Biggest seller, lowest margin</h4><p style="margin: 0; color: #3D4A45; font-size: 16px">The export warehouse brings in 32% of sales but has the lowest margin at 20%. It still leads on profit (about 60,000), yet the central warehouse earned about 51,500 on barely more than half the sales.</p></div><div style="display: flex; flex-direction: column; gap: 8px"><h4 style="margin: 0; font-size: 18px">Limits of the comparison</h4><p style="margin: 0; color: #3D4A45; font-size: 16px">Only the central warehouse has more than one transaction (3). For the other six, the average transaction equals total sales, so these findings are preliminary.</p></div><div style="display: flex; flex-direction: column; gap: 8px"><h4 style="margin: 0; font-size: 18px">Worth checking</h4><p style="margin: 0; color: #3D4A45; font-size: 16px">Sales are recorded from the quarantine and raw materials warehouses (270,000 combined). Quarantine usually holds stock awaiting inspection, so it is worth confirming whether this is a process issue or a recording error.</p></div></div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 20px; align-items: start">
+<div style="background: #F6F7F4; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h3 style="margin: 0; font-size: 22px">January sales by year</h3>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">The data holds only three months: January of 2024, 2025 and 2026, AMD</p>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px"><span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 3px; background: #5E9C8C"></span>Sales</span><span style="display: inline-flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 3px; background: #0F4D40"></span>Profit (share of sales)</span></div>
+<div role="img" aria-label="January sales: 2024 AMD 720,000, 2025 AMD 129,000, 2026 AMD 92,000" style="display: flex; gap: 20px; align-items: flex-end">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; min-width: 0">
+<span style="font-weight: 700; font-variant-numeric: tabular-nums">720,000</span>
+<div style="height: 220px; width: 100%; max-width: 96px; display: flex; align-items: flex-end">
+<div class="grow-y" style="width: 100%; height: 100.0%; background: #5E9C8C; border-radius: 6px 6px 0 0; display: flex; align-items: flex-end; overflow: hidden">
+<div style="width: 100%; height: 25.0%; background: #0F4D40"></div>
+</div>
+</div>
+<span style="font-size: 15px; font-weight: 600">Jan 2024</span>
+<span style="font-size: 14px; color: #4F5C57; font-variant-numeric: tabular-nums">Profit: 180,000</span>
+<span style="font-size: 14px; font-weight: 600; color: #0F6E5C">Margin: 25%</span>
+</div><div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; min-width: 0">
+<span style="font-weight: 700; font-variant-numeric: tabular-nums">129,000</span>
+<div style="height: 220px; width: 100%; max-width: 96px; display: flex; align-items: flex-end">
+<div class="grow-y" style="width: 100%; height: 17.9%; background: #5E9C8C; border-radius: 6px 6px 0 0; display: flex; align-items: flex-end; overflow: hidden">
+<div style="width: 100%; height: 33.3%; background: #0F4D40"></div>
+</div>
+</div>
+<span style="font-size: 15px; font-weight: 600">Jan 2025</span>
+<span style="font-size: 14px; color: #4F5C57; font-variant-numeric: tabular-nums">Profit: 43,000</span>
+<span style="font-size: 14px; font-weight: 600; color: #0F6E5C">Margin: 33.3%</span>
+</div><div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; min-width: 0">
+<span style="font-weight: 700; font-variant-numeric: tabular-nums">92,000</span>
+<div style="height: 220px; width: 100%; max-width: 96px; display: flex; align-items: flex-end">
+<div class="grow-y" style="width: 100%; height: 12.8%; background: #5E9C8C; border-radius: 6px 6px 0 0; display: flex; align-items: flex-end; overflow: hidden">
+<div style="width: 100%; height: 28.8%; background: #0F4D40"></div>
+</div>
+</div>
+<span style="font-size: 15px; font-weight: 600">Jan 2026</span>
+<span style="font-size: 14px; color: #4F5C57; font-variant-numeric: tabular-nums">Profit: 26,500</span>
+<span style="font-size: 14px; font-weight: 600; color: #0F6E5C">Margin: 28.8%</span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 18px; border-top: 1px solid #DCE2DD; padding-top: 20px"><div style="display: flex; flex-direction: column; gap: 6px"><h4 style="margin: 0; font-size: 17px">Volume fell sharply</h4><p style="margin: 0; color: #3D4A45; font-size: 15px">From 720,000 to 129,000 (−82%), then to 92,000 (−29%).</p></div><div style="display: flex; flex-direction: column; gap: 6px"><h4 style="margin: 0; font-size: 17px">Margin went up</h4><p style="margin: 0; color: #3D4A45; font-size: 15px">From 25% to 33.3%, then 28.8%: fewer sales, but each dram earned more.</p></div><div style="display: flex; flex-direction: column; gap: 6px"><h4 style="margin: 0; font-size: 17px">Three points, not a trend</h4><p style="margin: 0; color: #3D4A45; font-size: 15px">Each year has only January, so judging the real trend needs data for every month.</p></div></div>
+</div>
+<div style="background: #F6F7F4; border: 1px solid #DCE2DD; border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h3 style="margin: 0; font-size: 22px">Impact of discounts</h3>
+<p style="margin: 0; font-size: 15px; color: #4F5C57">Number of transaction lines by discount band</p>
+</div>
+<div role="img" aria-label="All 10 lines fall in the no-discount band; the other bands have 0" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px"><div style="display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 10px; background: #15201C; color: #FFFFFF; border: 1px solid #15201C"><span style="font-size: 14px">No discount</span><span style="font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums">10</span></div><div style="display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 10px; background: #FFFFFF; color: #4F5C57; border: 1px solid #DCE2DD"><span style="font-size: 14px">1–5%</span><span style="font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums">0</span></div><div style="display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 10px; background: #FFFFFF; color: #4F5C57; border: 1px solid #DCE2DD"><span style="font-size: 14px">5–10%</span><span style="font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums">0</span></div><div style="display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 10px; background: #FFFFFF; color: #4F5C57; border: 1px solid #DCE2DD"><span style="font-size: 14px">Over 10%</span><span style="font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums">0</span></div></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px"><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums">1,590</span><span style="font-size: 14px; color: #4F5C57">units sold</span></div><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums">26.51%</span><span style="font-size: 14px; color: #4F5C57">margin, baseline</span></div></div>
+<div style="display: flex; flex-direction: column; gap: 18px; border-top: 1px solid #DCE2DD; padding-top: 20px"><div style="display: flex; flex-direction: column; gap: 6px"><h4 style="margin: 0; font-size: 17px">No discounts were recorded</h4><p style="margin: 0; color: #3D4A45; font-size: 15px">All 10 sales lines carry no discount, so the effect of discounts cannot be measured with this data. That is a finding too: the 26.51% margin is a clean baseline.</p></div><div style="display: flex; flex-direction: column; gap: 6px"><h4 style="margin: 0; font-size: 17px">Next step</h4><p style="margin: 0; color: #3D4A45; font-size: 15px">Compare initial_price with selling_price: if they differ, discounts may be built into the price rather than stored in discount_percentage. The query is ready to run once discounted data appears.</p></div></div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="sql-en" style="max-width: 1120px; margin: 0 auto; padding: 80px 24px; display: flex; flex-direction: column; gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px">
+<div style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; letter-spacing: 0.04em; color: #0F6E5C">06 · SELECTED SQL</div>
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 34px; line-height: 1.25">How it was calculated</h2>
+<p style="margin: 0; color: #3D4A45">Three queries that show different techniques. Filter values are in Armenian: ‘Իրացում’ means sale.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline">
+<h3 style="margin: 0; font-size: 20px">Largest transaction per customer</h3>
+<span style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 13px; color: #0F6E5C">KEEP (DENSE_RANK FIRST)</span>
+</div>
+<p style="margin: 0; color: #3D4A45">Finds both the maximum amount and that transaction’s date in a single pass, with no extra join.</p>
+<div style="overflow-x: auto; background: #14201C; border-radius: 12px">
+<pre style="margin: 0; padding: 24px; color: #E4ECE8; font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; line-height: 1.6">SELECT
+    C.name AS customer_name,
+    MAX(TX.total_amount) AS max_transaction_amount,
+    MAX(TX.transaction_date) KEEP (DENSE_RANK FIRST ORDER BY TX.total_amount DESC) AS transaction_date
+FROM (
+    SELECT T.customer_id, T.transaction_date,
+           SUM(D.total_amount) AS total_amount
+    FROM P_Transactions T
+    JOIN P_TransactionDetails D ON D.transaction_id = T.transaction_id
+    WHERE T.transaction_type = 'Իրացում'
+    GROUP BY T.customer_id, T.transaction_id, T.transaction_date
+) TX
+JOIN P_Customers C ON C.customer_id = TX.customer_id
+GROUP BY C.customer_id, C.name
+ORDER BY max_transaction_amount DESC;</pre>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline">
+<h3 style="margin: 0; font-size: 20px">Products priced above average</h3>
+<span style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 13px; color: #0F6E5C">AVG(AVG()) OVER ()</span>
+</div>
+<p style="margin: 0; color: #3D4A45">A window function over an aggregate returns the average of per-product averages in the same query, so every product carries equal weight regardless of sales volume.</p>
+<div style="overflow-x: auto; background: #14201C; border-radius: 12px">
+<pre style="margin: 0; padding: 24px; color: #E4ECE8; font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; line-height: 1.6">SELECT code, name, avg_selling_price, overall_avg_price
+FROM (
+    SELECT
+        P.code,
+        P.name,
+        ROUND(AVG(D.selling_price), 2) AS avg_selling_price,
+        ROUND(AVG(AVG(D.selling_price)) OVER (), 2) AS overall_avg_price
+    FROM P_TransactionDetails D
+    JOIN P_Transactions T ON T.transaction_id = D.transaction_id
+    JOIN P_Products P ON P.product_id = D.product_id
+    WHERE T.transaction_type = 'Իրացում'
+    GROUP BY P.product_id, P.code, P.name
+)
+WHERE avg_selling_price &gt; overall_avg_price
+ORDER BY avg_selling_price DESC;</pre>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline">
+<h3 style="margin: 0; font-size: 20px">How discounts affect margin</h3>
+<span style="font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 13px; color: #0F6E5C">CASE · NULLIF · own question</span>
+</div>
+<p style="margin: 0; color: #3D4A45">My own question: transaction lines are grouped into discount bands, and NULLIF guards against division by zero.</p>
+<div style="overflow-x: auto; background: #14201C; border-radius: 12px">
+<pre style="margin: 0; padding: 24px; color: #E4ECE8; font-family: 'JetBrains Mono', 'Noto Sans Armenian', monospace; font-size: 14px; line-height: 1.6">SELECT
+    CASE
+        WHEN NVL(D.discount_percentage, 0) = 0 THEN '1. Առանց զեղչի'
+        WHEN D.discount_percentage &lt;= 5 THEN '2. 1-5%'
+        WHEN D.discount_percentage &lt;= 10 THEN '3. 5-10%'
+        ELSE '4. 10%-ից ավելի'
+    END AS discount_group,
+    COUNT(*) AS lines_count,
+    SUM(D.quantity) AS total_quantity,
+    SUM(D.total_amount) AS total_sales,
+    SUM(D.profit) AS total_profit,
+    ROUND(SUM(D.profit) / NULLIF(SUM(D.total_amount), 0) * 100, 2) AS avg_margin_pct
+FROM P_TransactionDetails D
+JOIN P_Transactions T ON T.transaction_id = D.transaction_id
+WHERE T.transaction_type = 'Իրացում'
+GROUP BY
+    CASE
+        WHEN NVL(D.discount_percentage, 0) = 0 THEN '1. Առանց զեղչի'
+        WHEN D.discount_percentage &lt;= 5 THEN '2. 1-5%'
+        WHEN D.discount_percentage &lt;= 10 THEN '3. 5-10%'
+        ELSE '4. 10%-ից ավելի'
+    END
+ORDER BY discount_group;</pre>
+</div>
+</div>
+</section>
+
+<section style="background: #15201C; color: #E4ECE8">
+<div style="max-width: 1120px; margin: 0 auto; padding: 72px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 30px; color: #FFFFFF">Skills</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px">
+<span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">Oracle SQL</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">JOINs</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">Aggregation</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">Window functions</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">Subqueries</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">CASE pivots</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">Data quality checks</span><span style="border: 1px solid #4F5C57; border-radius: 999px; padding: 6px 14px">Business recommendations</span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-family: 'Noto Serif Armenian', 'Noto Serif', Georgia, serif; font-size: 30px; color: #FFFFFF">Contact</h2>
+<p style="margin: 0; font-size: 19px; font-weight: 600; color: #FFFFFF">Zaruhi Danielyan</p>
+<p style="margin: 0">Email: <a href="mailto:zaruhidanielyan.1@gmail.com" style="color: #9FD8C8">zaruhidanielyan.1@gmail.com</a></p>
+<p style="margin: 0">LinkedIn: <a href="https://www.linkedin.com/in/zaruhi-danielyan" style="color: #9FD8C8">linkedin.com/in/zaruhi-danielyan</a></p>
+</div>
+</div>
+</section>
+</div>
+</div>
+<script>
+(function () {
+  var titles = { hy: 'Զարուհի Դանիելյան — SQL վերլուծություն', en: 'Zaruhi Danielyan — SQL case study' };
+  function setLang(lang) {
+    document.querySelectorAll('[data-lang]').forEach(function (el) { el.hidden = el.getAttribute('data-lang') !== lang; });
+    document.querySelectorAll('.lang-btn').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-set') === lang)); });
+    document.documentElement.lang = lang;
+    document.title = titles[lang];
+  }
+  document.querySelectorAll('.lang-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var lang = b.getAttribute('data-set');
+      setLang(lang);
+      history.replaceState(null, '', lang === 'en' ? '#en' : location.pathname + location.search);
+    });
+  });
+  setLang(location.hash === '#en' ? 'en' : 'hy');
+})();
+</script>
+</body>
+</html>
